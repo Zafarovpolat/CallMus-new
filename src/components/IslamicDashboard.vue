@@ -3,7 +3,7 @@
     <!-- Текстура поверх фона -->
     <div class="texture-overlay"></div>
 
-    <div class="max-w-7xl mx-auto space-y-4 w-full relative z-10">
+    <div class="max-w-[1360px] mx-auto space-y-4 w-full relative z-10">
       <!-- Top bar: Время + Календарь -->
       <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 items-start relative mb-12">
         <!-- Часы -->
@@ -17,9 +17,9 @@
         <div class="flex justify-center lg:justify-end">
           <div class="w-80 bg-white/60 backdrop-blur-sm rounded-3xl border border-white/50 shadow-lg p-3 overflow-hidden flex flex-col calendar-card">
             <div class="rounded-2xl text-white text-center font-semibold tracking-wide py-2 mb-3 flex items-center justify-between px-3 calendar-header">
-              <button @click="previousMonth" class="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full flex items-center justify-center text-white text-sm font-bold transition-colors">&#8249;</button>
+              <button @click="previousMonth" aria-label="Предыдущий месяц" class="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full flex items-center justify-center text-white text-sm font-bold transition-colors">&#8249;</button>
               <span class="font-poppins text-base">{{ currentMonthNameWithYear }}</span>
-              <button @click="nextMonth" class="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full flex items-center justify-center text-white text-sm font-bold transition-colors">&#8250;</button>
+              <button @click="nextMonth" aria-label="Следующий месяц" class="w-7 h-7 bg-white/30 hover:bg-white/50 rounded-full flex items-center justify-center text-white text-sm font-bold transition-colors">&#8250;</button>
             </div>
             <div class="px-1 flex-1">
               <div class="grid grid-cols-7 text-center text-gray-500 font-medium text-[11px] pb-2 mb-1">
@@ -46,8 +46,8 @@
       </div>
 
       <!-- Prayer Cards -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-        <div v-for="(p, index) in prayers" :key="p.title" class="w-full max-w-56 flex flex-col mx-auto mb-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 xl:gap-3">
+        <div v-for="(p, index) in prayers" :key="p.title" class="w-full max-w-[16rem] flex flex-col mx-auto mb-2">
           <h3 class="prayer-title text-gray-800 text-center mb-0 uppercase">{{ p.title }}</h3>
           <p class="prayer-title text-gray-400 text-center mb-3">{{ p.time }}</p>
           <div
@@ -69,7 +69,7 @@
                       input.expanded ? 'collapsed-hidden' : 'collapsed-visible',
                       !input.isFixed ? 'border border-gray-300 bg-white/50' : ''
                     ]"
-                    :style="input.isFixed ? { background: prayerItemGradients[index][inputIndex % 3] } : {}"
+                    :style="input.isFixed ? { background: getPrayerItemGradient(index, inputIndex, input) } : {}"
                   >
                     <input
                       @click="!input.isFixed && expandAndFocusText(index, inputIndex)"
@@ -110,6 +110,7 @@
                         @blur="handleExpandedBlur(index, inputIndex)"
                         class="prayer-card-text w-full resize-none max-h-20 overflow-y-auto break-words text-gray-700 p-2 bg-transparent placeholder:text-gray-400"
                         placeholder="Введите текст"
+                        aria-label="Текст элемента расписания"
                       ></textarea>
                       <input
                         class="prayer-card-text text-gray-700 bg-transparent border-none outline-none text-center p-1 placeholder:text-gray-400"
@@ -125,7 +126,7 @@
 
               <!-- Кнопка добавления - обводка -->
               <div class="mt-3 ml-2 mb-2">
-                <button @click="addNewInput(index)" class="w-8 h-8 rounded-full text-gray-400 text-lg flex items-center justify-center border-2 border-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors bg-transparent">
+                <button @click="addNewInput(index)" :aria-label="`Добавить элемент в ${p.title}`" class="w-8 h-8 rounded-full text-gray-400 text-lg flex items-center justify-center border-2 border-gray-300 hover:border-gray-400 hover:text-gray-500 transition-colors bg-transparent">
                   <span>+</span>
                 </button>
               </div>
@@ -135,20 +136,20 @@
       </div>
 
       <!-- Bottom Grid -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch">
         <!-- Напоминание - стекло с тёплыми пятнами -->
-        <div>
-          <div class="w-full min-h-[100%] rounded-2xl border border-white/50 shadow-lg transition-all duration-500 px-3 py-3 flex flex-col glass-card" style="background: radial-gradient(circle at 25% 30%, rgba(255, 183, 77, 0.4) 0%, transparent 50%), radial-gradient(circle at 75% 70%, rgba(255, 107, 157, 0.35) 0%, transparent 45%), radial-gradient(circle at 50% 90%, rgba(255, 224, 102, 0.3) 0%, transparent 40%), rgba(255,255,255,0.45);">
+        <div class="h-full">
+          <div class="w-full rounded-2xl border border-white/50 shadow-lg transition-all duration-500 px-4 py-4 flex flex-col glass-card bottom-card">
             <h3 class="prayer-card-text text-gray-800 text-center mb-2 uppercase">Напоминание</h3>
             <div class="w-full h-full flex-1 reminder-scroll-area">
-              <textarea class="w-full min-h-[15rem] h-full bg-transparent outline-none placeholder:text-gray-500/60 resize-none text-gray-800 p-2 reminder-textarea" placeholder="Введите напоминание"></textarea>
+              <textarea class="w-full h-full min-h-0 bg-transparent outline-none placeholder:text-gray-500/60 resize-none text-gray-800 p-2 reminder-textarea" placeholder="Введите напоминание" aria-label="Напоминание"></textarea>
             </div>
           </div>
         </div>
 
         <!-- Заметки - стекло с бирюзовыми пятнами -->
-        <div class="flex items-center justify-center">
-          <div class="w-full max-w-[320px] rounded-2xl border border-white/50 shadow-lg transition-all duration-500 px-3 pt-2 pb-3 flex flex-col glass-card" style="max-height: 320px; background: radial-gradient(circle at 30% 25%, rgba(0, 244, 224, 0.4) 0%, transparent 50%), radial-gradient(circle at 80% 65%, rgba(56, 189, 248, 0.35) 0%, transparent 45%), radial-gradient(circle at 20% 85%, rgba(52, 211, 153, 0.3) 0%, transparent 40%), rgba(255,255,255,0.45);">
+        <div class="h-full">
+          <div class="w-full rounded-2xl border border-white/50 shadow-lg transition-all duration-500 px-4 py-4 flex flex-col glass-card bottom-card">
             <h3 class="prayer-card-text text-gray-800 text-center mb-2 shrink-0 uppercase">Заметки</h3>
             <div class="flex flex-col min-h-0 flex-1">
               <div class="overflow-y-auto flex-1 min-h-0 space-y-2 notes-scroll pr-1">
@@ -162,11 +163,13 @@
                       note.focused ? 'note-expanded' : 'note-collapsed'
                     ]"
                     placeholder="Введите текст"
+                    :aria-label="`Заметка ${noteIndex + 1}`"
                   ></textarea>
                   <Transition name="fade">
                     <button
                       v-if="note.focused && notes.length > 1"
                       @mousedown.prevent="deleteNote(noteIndex)"
+                      :aria-label="`Удалить заметку ${noteIndex + 1}`"
                       class="absolute top-2 right-2 text-red-600 hover:text-red-800 text-sm bg-white/90 rounded-full w-6 h-6 flex items-center justify-center shadow-md transition-all hover:scale-110"
                     >
                       ✕
@@ -176,6 +179,7 @@
               </div>
               <button
                 @click="addNewNote"
+                aria-label="Добавить заметку"
                 class="w-full h-10 rounded-full bg-white/30 hover:bg-white/50 text-gray-800 font-medium transition-colors flex items-center justify-center shrink-0 mt-2 backdrop-blur-sm"
               >
                 <span class="text-lg mr-2">+</span>
@@ -186,10 +190,10 @@
         </div>
 
         <!-- Трекер - стекло с зелёными пятнами -->
-        <div>
-          <div class="w-full rounded-2xl border border-white/50 shadow-lg transition-all duration-500 p-5 glass-card" style="background: radial-gradient(circle at 35% 30%, rgba(74, 222, 128, 0.4) 0%, transparent 50%), radial-gradient(circle at 70% 75%, rgba(52, 211, 153, 0.35) 0%, transparent 45%), radial-gradient(circle at 20% 80%, rgba(45, 212, 191, 0.3) 0%, transparent 40%), rgba(255,255,255,0.45);">
+        <div class="h-full">
+          <div class="w-full rounded-2xl border border-white/50 shadow-lg transition-all duration-500 p-4 flex flex-col glass-card bottom-card">
             <h3 class="prayer-card-text text-gray-800 text-center mb-5 uppercase">Трекер</h3>
-            <div class="space-y-4">
+            <div class="space-y-4 flex-1 flex flex-col justify-center">
               <!-- Поклонения -->
               <div>
                 <p class="text-gray-600 text-center text-sm font-medium mb-2 tracking-wide">Поклонения</p>
@@ -264,6 +268,13 @@ const prayerItemGradients = [
   ['linear-gradient(90deg, #60a5fa, #818cf8)', 'linear-gradient(90deg, #38bdf8, #6366f1)', 'linear-gradient(90deg, #93c5fd, #60a5fa)'],     // Магриб - синие
   ['linear-gradient(90deg, #a78bfa, #c084fc)', 'linear-gradient(90deg, #c4b5fd, #f0abfc)', 'linear-gradient(90deg, #d8b4fe, #a78bfa)'],     // Иша - фиолетовые
 ]
+
+const namazItemGradient = 'linear-gradient(90deg, #5bb8a6 0%, #4ecdc4 48%, #45b7d1 100%)'
+
+const getPrayerItemGradient = (cardIndex: number, inputIndex: number, input: Input) => {
+  if (input.text.trim().toUpperCase() === 'НАМАЗ') return namazItemGradient
+  return prayerItemGradients[cardIndex][inputIndex % 3]
+}
 
 const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
   switch(prayer.title) {
@@ -578,18 +589,22 @@ onMounted(() => {
 
 /* Основной фон - bg.png */
 .main-bg {
-  background: url('/bg.png') repeat;
+  background-color: #f4f3ee;
+  background-image: url('/bg.png');
+  background-repeat: repeat;
   background-size: auto;
+  background-blend-mode: screen;
   position: relative;
 }
 
-/* Текстура поверх фона с 0.5 opacity */
+/* Текстура поверх фона */
 .texture-overlay {
   position: fixed;
   inset: 0;
   background: url('/Texture.png') repeat;
   background-size: auto;
-  opacity: 0.5;
+  opacity: 0.68;
+  mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 1;
 }
@@ -628,6 +643,16 @@ onMounted(() => {
 .glass-card {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+}
+
+.bottom-card {
+  height: 20rem;
+  min-height: 20rem;
+  background: radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.78) 0%, transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(91, 184, 166, 0.3) 0%, transparent 42%),
+    radial-gradient(circle at 78% 78%, rgba(69, 183, 209, 0.24) 0%, transparent 42%),
+    radial-gradient(circle at 22% 84%, rgba(166, 125, 216, 0.18) 0%, transparent 38%),
+    rgba(255, 255, 255, 0.58);
 }
 
 /* Календарь */
