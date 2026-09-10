@@ -65,7 +65,7 @@
                   <!-- Свёрнутый блок -->
                   <div @click="onRowClick(index, row, $event)"
                     :class="[
-                      'collapsed-input-block h-9 mx-1.5 mt-2 rounded-xl flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer select-none',
+                      'collapsed-input-block h-9 mx-1.5 mt-2 rounded-xl flex items-center overflow-hidden transition-all duration-300 ease-in-out cursor-pointer select-none touch-manipulation',
                       isRowExpanded(index, row) ? 'collapsed-hidden' : 'collapsed-visible',
                       row.kind === 'task' ? 'border border-gray-300 bg-white/50' : ''
                     ]"
@@ -100,7 +100,7 @@
     v-show="row.kind === 'fixed' || !isRowExpanded(index, row)"
     v-if="rowStatus(row) !== 'none'"
     type="button"
-    @click.stop="cycleStatus(row)"
+    @click.stop="onBadgeClick(row)"
     :aria-label="statusTitle(row)"
     :title="statusTitle(row)"
     :class="['task-status-badge', statusClass(row)]"
@@ -601,30 +601,6 @@ const handleTimeInput = (row: CardRow, event: Event) => {
 }
 
 
-const expandAndFocus = (cardIndex: number, row: CardRow, field: 'text' | 'time', event: Event) => {
-  if (row.kind !== 'task') return
-  const key = `${cardIndex}:${row.task.id}`
-  if (expandedKey.value === key) {
-    expandedKey.value = null
-    return
-  }
-  expandedKey.value = key
-  const container = (event.currentTarget as HTMLElement | null)?.closest('.list-item-container')
-  nextTick(() => {
-    if (!container) return
-    const target =
-      field === 'text'
-        ? container.querySelector('textarea')
-        : container.querySelector('.expandable-block-open input')
-    ;(target as HTMLElement | null)?.focus()
-  })
-}
-
-const expandAndFocusText = (cardIndex: number, row: CardRow, event: Event) =>
-  expandAndFocus(cardIndex, row, 'text', event)
-
-const expandAndFocusTime = (cardIndex: number, row: CardRow, event: Event) =>
-  expandAndFocus(cardIndex, row, 'time', event)
 
 
 const addNewInput = (cardIndex: number) => {
@@ -642,24 +618,63 @@ const addNewInput = (cardIndex: number) => {
 
 
 let statusClickTimer: ReturnType<typeof setTimeout> | null = null
+let statusClickKey: string | null = null
+const DBL_CLICK_DELAY = 300
+const FIXED_DEBOUNCE_DELAY = 500
+
+const openTaskEditor = (key: string, container: Element | null, field: 'text' | 'time') => {
+  expandedKey.value = key
+  nextTick(() => {
+    if (!container || !container.isConnected) return
+    const target =
+      field === 'text'
+        ? container.querySelector('textarea')
+        : container.querySelector('.expandable-block-open input')
+    ;(target as HTMLElement | null)?.focus()
+  })
+}
+
+const onBadgeClick = (row: CardRow) => {
+  if (statusClickTimer) {
+    clearTimeout(statusClickTimer)
+    statusClickTimer = null
+    statusClickKey = null
+  }
+  cycleStatus(row)
+}
 
 const onRowClick = (cardIndex: number, row: CardRow, event: MouseEvent) => {
-  if (row.kind === 'fixed') {
-    cycleStatus(row)
+  const key = row.kind === 'task' ? `${cardIndex}:${row.task.id}` : `${cardIndex}:${row.input.id}`
+  if (statusClickTimer && statusClickKey === key) {
+    clearTimeout(statusClickTimer)
+    statusClickTimer = null
+    statusClickKey = null
+    if (row.kind === 'task') cycleStatus(row)
     return
   }
   if (statusClickTimer) {
     clearTimeout(statusClickTimer)
     statusClickTimer = null
-    const target = event.target as HTMLElement | null
-    const field = target instanceof HTMLInputElement && target.placeholder === 'Время' ? 'time' : 'text'
-    expandAndFocus(cardIndex, row, field, event)
+    statusClickKey = null
+  }
+  if (row.kind === 'fixed') {
+    cycleStatus(row)
+    statusClickKey = key
+    statusClickTimer = setTimeout(() => {
+      statusClickTimer = null
+      statusClickKey = null
+    }, FIXED_DEBOUNCE_DELAY)
     return
   }
+  const container = (event.currentTarget as HTMLElement | null)?.closest('.list-item-container')
+  const target = event.target as HTMLElement | null
+  const field = target instanceof HTMLInputElement && target.placeholder === 'Время' ? 'time' : 'text'
+  statusClickKey = key
   statusClickTimer = setTimeout(() => {
     statusClickTimer = null
-    cycleStatus(row)
-  }, 250)
+    statusClickKey = null
+    openTaskEditor(key, container ?? null, field)
+  }, DBL_CLICK_DELAY)
 }
 
 
