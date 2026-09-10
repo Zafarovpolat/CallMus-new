@@ -78,7 +78,7 @@
                       :class="[
                         'prayer-card-text border-none outline-none px-3 h-full flex-1 truncate w-full bg-transparent',
                         row.kind === 'fixed' ? 'cursor-pointer text-white text-center font-medium drop-shadow-sm' : 'cursor-pointer hover:bg-gray-50/50 text-gray-700',
-                      rowStatus(row) === 'pending' ? 'line-through' : ''
+                      rowStatus(row) === 'done' ? 'line-through' : ''
                       ]"
                       readonly
                     />
@@ -98,6 +98,7 @@
                     <!-- Кружок статуса: завершить / вернуть задачу (правки N1, N3) -->
   <button
     v-show="row.kind === 'fixed' || !isRowExpanded(index, row)"
+    v-if="rowStatus(row) !== 'none'"
     type="button"
     @click.stop="cycleStatus(row)"
     :aria-label="statusTitle(row)"
@@ -105,8 +106,7 @@
     :class="['task-status-badge', statusClass(row)]"
   >
     <span v-if="rowStatus(row) === 'done'" aria-hidden="true">✓</span>
-    <span v-else-if="rowStatus(row) === 'progress'" aria-hidden="true">◷</span>
-    <span v-else aria-hidden="true">✕</span>
+    <span v-else aria-hidden="true">◷</span>
   </button>
   <!-- Раскрывающийся блок -->
                   <div
@@ -241,7 +241,7 @@ interface Input {
   status: TaskStatus
   isPinned?: boolean
 }
-type TaskStatus = 'pending' | 'progress' | 'done'
+type TaskStatus = 'none' | 'progress' | 'done'
 
 interface Task {
   id: string
@@ -329,7 +329,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Ратибат',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         },
         {
           id: `namaz-${prayer.title}-${Date.now()}-2`,
@@ -337,7 +337,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'НАМАЗ',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         },
         {
           id: `azkary-${prayer.title}-${Date.now()}-3`,
@@ -345,7 +345,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Азкары',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         }
       ]
 
@@ -358,7 +358,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'НАМАЗ',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         },
         {
           id: `ratibat-${prayer.title}-${Date.now()}-2`,
@@ -366,7 +366,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Ратибат',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         }
       ]
 
@@ -378,7 +378,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'НАМАЗ',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         },
         {
           id: `ratibat-${prayer.title}-${Date.now()}-2`,
@@ -386,7 +386,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Ратибат',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         },
         {
           id: `tahajjud-${prayer.title}-${Date.now()}-3`,
@@ -394,7 +394,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Тахаджуд',
           isFixed: true,
-          status: 'pending',
+          status: 'none',
           isPinned: true
         }
       ]
@@ -407,7 +407,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Намаз',
           isFixed: true,
-          status: 'pending'
+          status: 'none'
         }
       ]
   }
@@ -546,15 +546,15 @@ const rowTime = (row: CardRow): string => (row.kind === 'task' ? row.task.time :
 const rowStatus = (row: CardRow): TaskStatus => (row.kind === 'task' ? row.task.status : row.input.status)
 const statusClass = (row: CardRow): string => {
   const s = rowStatus(row)
-  return s === 'done' ? 'task-status-done' : s === 'progress' ? 'task-status-progress' : 'task-status-pending'
+  return s === 'done' ? 'task-status-done' : s === 'progress' ? 'task-status-progress' : ''
 }
 const statusTitle = (row: CardRow): string => {
   const s = rowStatus(row)
-  const name = s === 'done' ? 'Выполнено' : s === 'progress' ? 'В процессе' : 'Просрочено'
+  const name = s === 'done' ? 'Выполнено' : s === 'progress' ? 'В процессе' : 'Без статуса'
   return `${name} (нажмите, чтобы сменить статус)`
 }
 const cycleStatus = (row: CardRow) => {
-  const order: TaskStatus[] = ['pending', 'progress', 'done']
+  const order: TaskStatus[] = ['none', 'progress', 'done']
   const next = order[(order.indexOf(rowStatus(row)) + 1) % order.length]
   if (row.kind === 'task') row.task.status = next
   else row.input.status = next
@@ -634,7 +634,7 @@ const addNewInput = (cardIndex: number) => {
     time: '',
     start: null,
     end: null,
-    status: 'pending',
+    status: 'none',
     draftCard: cardIndex
   }
   tasks.value.push(task)
@@ -907,15 +907,15 @@ onMounted(() => {
 /* Кружок статуса задачи в правом верхнем углу плашки (правки N1, N3) */
 .task-status-badge {
   position: absolute;
-  top: -7px;
-  right: 0;
-  width: 22px;
-  height: 22px;
+  top: -6px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
   border-radius: 9999px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
   line-height: 1;
   color: #fff;
@@ -937,9 +937,6 @@ onMounted(() => {
 }
 .task-status-progress {
   background-color: #f59e0b;
-}
-.task-status-pending {
-  background-color: #ef4444;
 }
 
 /* Анимация для кнопки удаления */
