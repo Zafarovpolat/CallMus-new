@@ -919,7 +919,7 @@ onMounted(() => {
   font-weight: 800;
   line-height: 1;
   color: #fff;
-  border: 2px solid #fff;
+  border: 1px solid #fff;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
   cursor: pointer;
   z-index: 5;
