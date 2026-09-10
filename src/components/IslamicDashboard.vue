@@ -54,69 +54,81 @@
             :class="`prayer-card-${index} w-full aspect-[9/16] rounded-2xl border border-white/50 relative overflow-hidden pb-2 flex flex-col glass-card`"
             :style="{ boxShadow: prayerCardGlows[index], background: prayerCardBgs[index] }"
           >
-            <div class="prayer-card-content h-full overflow-y-auto px-1">
+            <div class="prayer-card-content h-full overflow-y-auto pt-2 px-1">
               <!-- Элементы карточки -->
               <TransitionGroup name="list-item" tag="div">
                 <div
-                  v-for="(input, inputIndex) in prayerCardStates[index].inputs"
-                  :key="input.id"
-                  class="list-item-container mb-1"
+                  v-for="(row, rowIndex) in cardRows(index)"
+                  :key="rowKey(row)"
+                  class="list-item-container relative mb-1"
                 >
                   <!-- Свёрнутый блок -->
                   <div
                     :class="[
                       'collapsed-input-block h-9 mx-1.5 mt-2 rounded-xl flex items-center overflow-hidden transition-all duration-300 ease-in-out',
-                      input.expanded ? 'collapsed-hidden' : 'collapsed-visible',
-                      !input.isFixed ? 'border border-gray-300 bg-white/50' : ''
+                      isRowExpanded(index, row) ? 'collapsed-hidden' : 'collapsed-visible',
+                      row.kind === 'task' ? 'border border-gray-300 bg-white/50' : ''
                     ]"
-                    :style="input.isFixed ? { background: getPrayerItemGradient(index, inputIndex, input) } : {}"
+                    :style="rowGradient(index, rowIndex, row)"
                   >
                     <input
-                      @click="!input.isFixed && expandAndFocusText(index, inputIndex)"
-                      :value="input.text"
-                      :title="input.text"
+                      @click="row.kind === 'task' && expandAndFocusText(index, row, $event)"
+                      :value="rowText(row)"
+                      :title="rowText(row)"
                       placeholder="Текст"
                       :class="[
                         'prayer-card-text border-none outline-none px-3 h-full flex-1 truncate w-full bg-transparent',
-                        input.isFixed ? 'cursor-default text-white text-center font-medium drop-shadow-sm' : 'cursor-pointer hover:bg-gray-50/50 text-gray-700'
+                        row.kind === 'fixed' ? 'cursor-default text-white text-center font-medium drop-shadow-sm' : 'cursor-pointer hover:bg-gray-50/50 text-gray-700'
                       ]"
                       readonly
                     />
-                    <div v-if="!input.isFixed || input.time" class="h-full flex items-center">
+                    <div v-if="row.kind === 'task' || rowTime(row)" class="h-full flex items-center">
                       <input
-                        @click="!input.isFixed && expandAndFocusTime(index, inputIndex)"
-                        :value="input.time"
+                        @click="row.kind === 'task' && expandAndFocusTime(index, row, $event)"
+                        :value="rowTime(row)"
                         placeholder="Время"
                         :class="[
                           'prayer-card-text border-none outline-none h-full w-auto min-w-[60px] max-w-[110px] text-right placeholder:text-right px-2 whitespace-nowrap bg-transparent',
-                          input.isFixed ? 'cursor-default text-white/80' : 'cursor-pointer hover:bg-gray-50/50 text-gray-500'
+                          row.kind === 'fixed' ? 'cursor-default text-white/80' : 'cursor-pointer hover:bg-gray-50/50 text-gray-500'
                         ]"
                         readonly
                       />
                     </div>
                   </div>
 
-                  <!-- Раскрывающийся блок -->
+                    <!-- Кружок статуса: завершить / вернуть задачу (правки N1, N3) -->
+  <button
+    v-show="row.kind === 'fixed' || !isRowExpanded(index, row)"
+    type="button"
+    @click.stop="toggleDone(row)"
+    :aria-label="rowDone(row) ? 'Отметить задачу невыполненной' : 'Отметить задачу выполненной'"
+    :title="rowDone(row) ? 'Выполнено (нажмите, чтобы вернуть в работу)' : 'Не выполнено (нажмите, чтобы завершить)'"
+    :class="['task-status-badge', rowDone(row) ? 'task-status-done' : 'task-status-pending']"
+  >
+    <span v-if="rowDone(row)" aria-hidden="true">✓</span>
+    <span v-else aria-hidden="true">✕</span>
+  </button>
+  <!-- Раскрывающийся блок -->
                   <div
-                    v-if="!input.isFixed"
+                    v-if="row.kind === 'task'"
                     :class="[
                       'expandable-block mx-1.5 mt-0 overflow-hidden transition-all duration-300 ease-in-out',
-                      input.expanded ? 'expandable-block-open' : 'expandable-block-closed'
+                      isRowExpanded(index, row) ? 'expandable-block-open' : 'expandable-block-closed'
                     ]"
                   >
                     <div class="bg-white/80 border border-gray-200 rounded-xl backdrop-blur-sm flex flex-col">
                       <textarea
-                        v-model="input.text"
-                        @blur="handleExpandedBlur(index, inputIndex)"
+                        :value="rowText(row)" @input="onTaskTextInput(row, $event)"
+                        @blur="handleExpandedBlur(index, row, $event)"
                         class="prayer-card-text w-full resize-none max-h-20 overflow-y-auto break-words text-gray-700 p-2 bg-transparent placeholder:text-gray-400"
                         placeholder="Введите текст"
                         aria-label="Текст элемента расписания"
                       ></textarea>
                       <input
                         class="prayer-card-text text-gray-700 bg-transparent border-none outline-none text-center p-1 placeholder:text-gray-400"
-                        v-model="input.time"
-                        @blur="handleExpandedBlur(index, inputIndex)"
-                        @input="handleTimeInput(index, $event, inputIndex)"
+                        :value="rowTime(row)"
+                        @blur="handleExpandedBlur(index, row, $event)"
+                        @input="handleTimeInput(row, $event)"
                         placeholder="00:00 - 00:00"
                       />
                     </div>
@@ -226,8 +238,31 @@ interface Input {
   time: string
   text: string
   isFixed: boolean
+  done: boolean
   isPinned?: boolean
 }
+interface Task {
+  id: string
+  text: string
+  time: string
+  start: number | null
+  end: number | null
+  done: boolean
+  draftCard: number | null
+}
+
+interface CardRowFixed {
+  kind: 'fixed'
+  input: Input
+}
+
+interface CardRowTask {
+  kind: 'task'
+  task: Task
+}
+
+type CardRow = CardRowFixed | CardRowTask
+
 
 const prayers: PrayerCard[] = [
   { title: 'Фаджр', time: '04:00' },
@@ -275,6 +310,11 @@ const getPrayerItemGradient = (cardIndex: number, inputIndex: number, input: Inp
   if (input.text.trim().toUpperCase() === 'НАМАЗ') return namazItemGradient
   return prayerItemGradients[cardIndex][inputIndex % 3]
 }
+const rowGradient = (cardIndex: number, rowIndex: number, row: CardRow) => {
+  if (row.kind !== 'fixed') return {}
+  return { background: getPrayerItemGradient(cardIndex, rowIndex, row.input) }
+}
+
 
 const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
   switch(prayer.title) {
@@ -286,21 +326,24 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           expanded: false,
           time: '',
           text: 'Ратибат',
-          isFixed: true
+          isFixed: true,
+          done: false
         },
         {
           id: `namaz-${prayer.title}-${Date.now()}-2`,
           expanded: false,
           time: '',
           text: 'НАМАЗ',
-          isFixed: true
+          isFixed: true,
+          done: false
         },
         {
           id: `azkary-${prayer.title}-${Date.now()}-3`,
           expanded: false,
           time: '',
           text: 'Азкары',
-          isFixed: true
+          isFixed: true,
+          done: false
         }
       ]
 
@@ -312,14 +355,16 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           expanded: false,
           time: '',
           text: 'НАМАЗ',
-          isFixed: true
+          isFixed: true,
+          done: false
         },
         {
           id: `ratibat-${prayer.title}-${Date.now()}-2`,
           expanded: false,
           time: '',
           text: 'Ратибат',
-          isFixed: true
+          isFixed: true,
+          done: false
         }
       ]
 
@@ -330,14 +375,16 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           expanded: false,
           time: '',
           text: 'НАМАЗ',
-          isFixed: true
+          isFixed: true,
+          done: false
         },
         {
           id: `ratibat-${prayer.title}-${Date.now()}-2`,
           expanded: false,
           time: '',
           text: 'Ратибат',
-          isFixed: true
+          isFixed: true,
+          done: false
         },
         {
           id: `tahajjud-${prayer.title}-${Date.now()}-3`,
@@ -345,6 +392,7 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           time: '',
           text: 'Тахаджуд',
           isFixed: true,
+          done: false,
           isPinned: true
         }
       ]
@@ -356,7 +404,8 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
           expanded: false,
           time: '',
           text: 'Намаз',
-          isFixed: true
+          isFixed: true,
+          done: false
         }
       ]
   }
@@ -365,11 +414,12 @@ const getInitialInputsForPrayer = (prayer: PrayerCard): Input[] => {
 const currentDate = ref(new Date())
 const selectedDate = ref(new Date())
 
-const prayerCardStates = ref(
-  prayers.map(prayer => ({
-    inputs: getInitialInputsForPrayer(prayer)
-  }))
-)
+const fixedInputs = ref(prayers.map(prayer => getInitialInputsForPrayer(prayer)))
+
+const tasks = ref<Task[]>([])
+
+const expandedKey = ref<string | null>(null)
+
 
 // Notes state
 const notes = ref([
@@ -418,6 +468,97 @@ const calendarDays = computed(() => {
   return days
 })
 
+const MINUTES_IN_DAY = 24 * 60
+
+const prayerStartMinutes = computed(() =>
+  prayers.map(p => {
+    const [h, m] = p.time.split(':').map(Number)
+    return h * 60 + (m || 0)
+  })
+)
+
+const cardInterval = (cardIndex: number): { start: number; end: number } => {
+  const starts = prayerStartMinutes.value
+  const start = starts[cardIndex]
+  const end = cardIndex + 1 < starts.length ? starts[cardIndex + 1] : starts[0] + MINUTES_IN_DAY
+  return { start, end }
+}
+
+const parseTimeRange = (value: string): { start: number; end: number } | null => {
+  const parts = value.match(/(\d{1,2}):(\d{2})/g)
+  if (!parts || parts.length === 0) return null
+  const toMin = (s: string): number | null => {
+    const [h, m] = s.split(':').map(Number)
+    if (h > 23 || m > 59) return null
+    return h * 60 + m
+  }
+  const first = toMin(parts[0])
+  if (first === null) return null
+  if (parts.length === 1) return { start: first, end: first }
+  const second = toMin(parts[1])
+  if (second === null) return { start: first, end: first }
+  const end = second < first ? second + MINUTES_IN_DAY : second
+  return { start: first, end }
+}
+
+const rangesOverlap = (aStart: number, aEnd: number, bStart: number, bEnd: number): boolean => {
+  if (aStart === aEnd) return aStart >= bStart && aStart < bEnd
+  return aStart < bEnd && bStart < aEnd
+}
+
+const taskOverlapsCard = (task: Task, cardIndex: number): boolean => {
+  if (task.start === null || task.end === null) return false
+  const { start: cs, end: ce } = cardInterval(cardIndex)
+  for (const shift of [0, MINUTES_IN_DAY, -MINUTES_IN_DAY]) {
+    if (rangesOverlap(task.start + shift, task.end + shift, cs, ce)) return true
+  }
+  return false
+}
+
+const tasksForCard = (cardIndex: number): Task[] => {
+  return tasks.value.filter(task => {
+    if (taskOverlapsCard(task, cardIndex)) return true
+    if ((task.start === null || task.end === null) && task.draftCard === cardIndex) return true
+    if (expandedKey.value === `${cardIndex}:${task.id}`) return true
+    return false
+  })
+}
+
+const cardRows = (cardIndex: number): CardRow[] => {
+  const fixed = fixedInputs.value[cardIndex]
+  const rows: CardRow[] = fixed
+    .filter(f => !f.isPinned)
+    .map(input => ({ kind: 'fixed' as const, input }))
+  for (const task of tasksForCard(cardIndex)) {
+    rows.push({ kind: 'task' as const, task })
+  }
+  for (const input of fixed.filter(f => f.isPinned)) {
+    rows.push({ kind: 'fixed' as const, input })
+  }
+  return rows
+}
+
+const rowKey = (row: CardRow): string => (row.kind === 'task' ? row.task.id : row.input.id)
+const rowText = (row: CardRow): string => (row.kind === 'task' ? row.task.text : row.input.text)
+const rowTime = (row: CardRow): string => (row.kind === 'task' ? row.task.time : row.input.time)
+const rowDone = (row: CardRow): boolean => (row.kind === 'task' ? row.task.done : row.input.done)
+const isRowExpanded = (cardIndex: number, row: CardRow): boolean =>
+  row.kind === 'task' && expandedKey.value === `${cardIndex}:${row.task.id}`
+
+const commitTaskTime = (task: Task) => {
+  const parsed = parseTimeRange(task.time)
+  if (parsed) {
+    task.start = parsed.start
+    task.end = parsed.end
+    task.draftCard = null
+  }
+}
+
+const onTaskTextInput = (row: CardRow, event: Event) => {
+  if (row.kind !== 'task') return
+  row.task.text = (event.target as HTMLTextAreaElement).value
+}
+
 const previousMonth = () => {
   currentDate.value = new Date(currentYear.value, currentMonth.value - 1, 1)
 }
@@ -436,97 +577,77 @@ const formatTimeInput = (value: string) => {
   return formatted
 }
 
-const handleTimeInput = (cardIndex: number, event: Event, inputIndex: number) => {
+const handleTimeInput = (row: CardRow, event: Event) => {
+  if (row.kind !== 'task') return
   const target = event.target as HTMLInputElement
-  const formatted = formatTimeInput(target.value)
-  prayerCardStates.value[cardIndex].inputs[inputIndex].time = formatted
+  row.task.time = formatTimeInput(target.value)
 }
 
-const expandAndFocusText = async (cardIndex: number, inputIndex: number) => {
-  if (prayerCardStates.value[cardIndex].inputs[inputIndex].isFixed) return
 
-  if (prayerCardStates.value[cardIndex].inputs[inputIndex].expanded) {
-    prayerCardStates.value[cardIndex].inputs[inputIndex].expanded = false
+const expandAndFocus = (cardIndex: number, row: CardRow, field: 'text' | 'time', event: Event) => {
+  if (row.kind !== 'task') return
+  const key = `${cardIndex}:${row.task.id}`
+  if (expandedKey.value === key) {
+    expandedKey.value = null
     return
   }
-
-  prayerCardStates.value[cardIndex].inputs.forEach((input, index) => {
-    if (index !== inputIndex) {
-      input.expanded = false
-    }
+  expandedKey.value = key
+  const container = (event.currentTarget as HTMLElement | null)?.closest('.list-item-container')
+  nextTick(() => {
+    if (!container) return
+    const target =
+      field === 'text'
+        ? container.querySelector('textarea')
+        : container.querySelector('.expandable-block-open input')
+    ;(target as HTMLElement | null)?.focus()
   })
-
-  prayerCardStates.value[cardIndex].inputs[inputIndex].expanded = true
-  await nextTick()
-
-  const textareas = document.querySelectorAll(`.prayer-card-${cardIndex} textarea`)
-  const targetTextarea = Array.from(textareas).find(ta =>
-    ta.closest('.list-item-container') === document.querySelectorAll(`.prayer-card-${cardIndex} .list-item-container`)[inputIndex]
-  ) as HTMLTextAreaElement
-
-  if (targetTextarea) {
-    targetTextarea.focus()
-  }
 }
 
-const expandAndFocusTime = async (cardIndex: number, inputIndex: number) => {
-  if (prayerCardStates.value[cardIndex].inputs[inputIndex].isFixed) return
+const expandAndFocusText = (cardIndex: number, row: CardRow, event: Event) =>
+  expandAndFocus(cardIndex, row, 'text', event)
 
-  if (prayerCardStates.value[cardIndex].inputs[inputIndex].expanded) {
-    prayerCardStates.value[cardIndex].inputs[inputIndex].expanded = false
-    return
-  }
+const expandAndFocusTime = (cardIndex: number, row: CardRow, event: Event) =>
+  expandAndFocus(cardIndex, row, 'time', event)
 
-  prayerCardStates.value[cardIndex].inputs.forEach((input, index) => {
-    if (index !== inputIndex) {
-      input.expanded = false
-    }
-  })
-
-  prayerCardStates.value[cardIndex].inputs[inputIndex].expanded = true
-  await nextTick()
-
-  const expandedBlocks = document.querySelectorAll(`.prayer-card-${cardIndex} .expandable-block-open input[type="text"], .prayer-card-${cardIndex} .expandable-block-open input:not([type])`)
-  const targetTimeInput = Array.from(expandedBlocks).find(input =>
-    input.closest('.list-item-container') === document.querySelectorAll(`.prayer-card-${cardIndex} .list-item-container`)[inputIndex]
-  ) as HTMLInputElement
-
-  if (targetTimeInput) {
-    targetTimeInput.focus()
-  }
-}
 
 const addNewInput = (cardIndex: number) => {
-  const prayer = prayers[cardIndex]
-  const newInput: Input = {
+  const task: Task = {
     id: `new-${Date.now()}-${Math.random()}`,
-    expanded: false,
-    time: '',
     text: '',
-    isFixed: false
+    time: '',
+    start: null,
+    end: null,
+    done: false,
+    draftCard: cardIndex
   }
+  tasks.value.push(task)
+}
 
-  if (prayer.title === 'Иша') {
-    // Для Иша добавляем перед последним элементом (Тахаджуд)
-    const inputs = prayerCardStates.value[cardIndex].inputs
-    prayerCardStates.value[cardIndex].inputs.splice(inputs.length - 1, 0, newInput)
+
+const toggleDone = (row: CardRow) => {
+  if (row.kind === 'fixed') {
+    row.input.done = !row.input.done
   } else {
-    prayerCardStates.value[cardIndex].inputs.push(newInput)
+    row.task.done = !row.task.done
   }
 }
 
-const handleExpandedBlur = (cardIndex: number, inputIndex: number) => {
+
+const handleExpandedBlur = (cardIndex: number, row: CardRow, event: FocusEvent) => {
+  if (row.kind !== 'task') return
+  const taskId = row.task.id
+  commitTaskTime(row.task)
+  const container = (event.target as HTMLElement | null)?.closest('.list-item-container')
   setTimeout(() => {
     const activeElement = document.activeElement
-    const container = document.querySelectorAll(`.prayer-card-${cardIndex} .list-item-container`)[inputIndex] as HTMLElement
-
     if (container && (!activeElement || !container.contains(activeElement))) {
-      if (prayerCardStates.value[cardIndex]?.inputs[inputIndex]) {
-        prayerCardStates.value[cardIndex].inputs[inputIndex].expanded = false
+      if (expandedKey.value === `${cardIndex}:${taskId}`) {
+        expandedKey.value = null
       }
     }
   }, 100)
 }
+
 
 const focusNote = (noteIndex: number) => {
   if (notes.value[noteIndex]) {
@@ -751,6 +872,41 @@ onMounted(() => {
   height: 5.5rem;
   min-height: 5.5rem;
   max-height: 5.5rem;
+}
+
+/* Кружок статуса задачи в правом верхнем углу плашки (правки N1, N3) */
+.task-status-badge {
+  position: absolute;
+  top: -7px;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  z-index: 5;
+  padding: 0;
+  transition: transform 0.15s ease, background-color 0.2s ease;
+}
+.task-status-badge:hover {
+  transform: scale(1.15);
+}
+.task-status-badge:active {
+  transform: scale(0.95);
+}
+.task-status-done {
+  background-color: #22c55e;
+}
+.task-status-pending {
+  background-color: #ef4444;
 }
 
 /* Анимация для кнопки удаления */
